@@ -85,15 +85,14 @@ ai-prompt-manager/
 │   │   ├── js/           # JavaScript logic
 │   │   └── css/          # Style files
 │   ├── popup/            # Popup interface
-│   │   ├── popup.html    # Popup page
-│   │   ├── popup.js      # Popup logic
-│   │   └── popup.css     # Popup styles
+│   │   ├── popup.html    # Popup page (with inline styles)
+│   │   └── js/           # Popup logic
 │   ├── background/       # Background scripts
 │   ├── welcome/          # Welcome page
 │   └── lib/              # Third-party libraries
 ├── assets/               # Static resources
 │   └── icons/           # Icon files
-└── docs/                # Documentation
+└── scripts/             # Build scripts
 ```
 
 ## 🎮 Development Guide
