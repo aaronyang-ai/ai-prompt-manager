@@ -1,0 +1,41 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch Chrome Extension",
+      "type": "chrome",
+      "request": "launch",
+      "url": "chrome://extensions/",
+      "webRoot": "${workspaceFolder}",
+      "runtimeArgs": [
+        "--load-extension=${workspaceFolder}",
+        "--disable-extensions-except=${workspaceFolder}",
+        "--user-data-dir=${workspaceFolder}/.chrome-dev"
+      ]
+    },
+    {
+      "name": "Debug ChatGPT",
+      "type": "chrome",
+      "request": "launch",
+      "url": "https://chat.openai.com/",
+      "webRoot": "${workspaceFolder}",
+      "runtimeArgs": [
+        "--load-extension=${workspaceFolder}",
+        "--disable-extensions-except=${workspaceFolder}",
+        "--user-data-dir=${workspaceFolder}/.chrome-dev"
+      ]
+    },
+    {
+      "name": "Debug Claude",
+      "type": "chrome",
+      "request": "launch",
+      "url": "https://claude.ai/",
+      "webRoot": "${workspaceFolder}",
+      "runtimeArgs": [
+        "--load-extension=${workspaceFolder}",
+        "--disable-extensions-except=${workspaceFolder}",
+        "--user-data-dir=${workspaceFolder}/.chrome-dev"
+      ]
+    }
+  ]
+} 

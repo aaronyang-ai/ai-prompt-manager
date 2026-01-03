@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0A84FF"/>
+      <stop offset="100%" style="stop-color:#0066CC"/>
+    </linearGradient>
+    <linearGradient id="letterGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF"/>
+      <stop offset="100%" style="stop-color:#F0F0F5"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 圆角方块背景 -->
+  <rect x="8" y="8" width="112" height="112" rx="28" ry="28" fill="url(#bgGradient)"/>
+  
+  <!-- 字母 P - Apple 风格粗体圆润设计 -->
+  <path d="M42 94V34h24c14.4 0 24 9.6 24 22s-9.6 22-24 22H56v16H42zm14-30h9c6 0 10-4 10-10s-4-10-10-10h-9v20z" 
+        fill="url(#letterGradient)"/>
+</svg>

@@ -1,0 +1,75 @@
+{
+  "manifest_version": 3,
+  "name": "AI提示词管理器",
+  "version": "1.2.0",
+  "description": "在ChatGPT、Claude、Gemini、Grok、Perplexity、DeepSeek、豆包、千问等AI页面高效管理和快速插入预设提示词",
+  "icons": {
+    "16": "assets/icons/icon16.png",
+    "48": "assets/icons/icon48.png",
+    "128": "assets/icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "assets/icons/icon16.png",
+      "48": "assets/icons/icon48.png",
+      "128": "assets/icons/icon128.png"
+    }
+  },
+  "permissions": [
+    "storage",
+    "tabs",
+    "scripting",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://chat.openai.com/*",
+    "https://chatgpt.com/*",
+    "https://claude.ai/*",
+    "https://gemini.google.com/*",
+    "https://grok.com/*",
+    "https://x.com/*",
+    "https://www.perplexity.ai/*",
+    "https://chat.deepseek.com/*",
+    "https://www.doubao.com/*",
+    "https://chat.qwen.ai/*",
+    "https://qianwen.aliyun.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://grok.com/*",
+        "https://x.com/*",
+        "https://www.perplexity.ai/*",
+        "https://chat.deepseek.com/*",
+        "https://www.doubao.com/*",
+        "https://chat.qwen.ai/*",
+        "https://qianwen.aliyun.com/*"
+      ],
+      "js": ["src/content/js/content.js"],
+      "css": ["src/content/css/content.css"],
+      "run_at": "document_end"
+    }
+  ],
+  "background": {
+    "service_worker": "src/background/js/background.js"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/welcome/welcome.html",
+        "assets/icons/*",
+        "src/content/css/content.css",
+        "src/lib/marked.min.js"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ]
+} 

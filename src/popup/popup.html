@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 提示词管理器</title>
+  <style>
+    /* Apple/Figma Premium Design System */
+    :root {
+      --primary: #007AFF;
+      --primary-hover: #0062CC;
+      --primary-light: rgba(0, 122, 255, 0.1);
+      
+      --bg-body: #F5F5F7;
+      --bg-card: #FFFFFF;
+      --bg-input: #F2F4F7;
+      
+      --text-primary: #111111;
+      --text-secondary: #555555;
+      --text-tertiary: #999999;
+      
+      --border: rgba(0, 0, 0, 0.06);
+      
+      /* Premium Light & Shadows */
+      --shadow-card: 
+        0 1px 2px rgba(0,0,0,0.04),
+        0 2px 8px rgba(0,0,0,0.02),
+        inset 0 1px 0 0 rgba(255,255,255,0.8);
+        
+      --shadow-card-hover: 
+        0 4px 16px rgba(0,0,0,0.08),
+        0 2px 4px rgba(0,0,0,0.04),
+        inset 0 1px 0 0 rgba(255,255,255,0.8);
+        
+      --shadow-modal: 0 8px 30px rgba(0,0,0,0.12);
+      
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+      --radius-xl: 20px;
+      
+      --success: #34C759;
+      --warning: #FF9500;
+      --error: #FF3B30;
+      
+      --ease-bounce: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    [data-theme="dark"] {
+      --primary: #0A84FF;
+      --bg-body: #000000;
+      --bg-card: #1C1C1E;
+      --bg-input: #2C2C2E;
+      
+      --text-primary: #FFFFFF;
+      --text-secondary: #98989D;
+      --text-tertiary: #636366;
+      
+      --border: rgba(255, 255, 255, 0.1);
+      
+      /* Dark mode lighting: Inner glow */
+      --shadow-card: 
+        0 2px 8px rgba(0,0,0,0.2),
+        inset 0 1px 0 0 rgba(255,255,255,0.08);
+      --shadow-card-hover: 
+        0 8px 24px rgba(0,0,0,0.4),
+        inset 0 1px 0 0 rgba(255,255,255,0.12);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      width: 420px;
+      min-height: 520px;
+      max-height: 600px;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--text-primary);
+      background: var(--bg-body);
+      -webkit-font-smoothing: antialiased;
+      overflow-y: auto;
+    }
+
+    /* Header */
+    .header {
+      padding: 20px 24px 16px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-logo {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .header-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+    }
+
+    .header-version {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-tertiary);
+      padding: 2px 8px;
+      background: var(--bg-body);
+      border-radius: 100px;
+    }
+
+    /* Tab Navigation */
+    .tabs {
+      display: flex;
+      background: var(--bg-body);
+      border-radius: var(--radius-md);
+      padding: 4px;
+      gap: 4px;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 7px 12px;
+      border: none;
+      background: transparent;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .tab:hover {
+      color: var(--text-primary);
+    }
+
+    .tab.active {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    }
+
+    /* Main Content Area */
+    .main { min-height: 380px; }
+    .section { display: none; padding: 0; }
+    .section.active { display: block; animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Toolbar */
+    .toolbar {
+      padding: 16px 24px 8px;
+      background: var(--bg-body);
+    }
+
+    .search-container { flex: 1; position: relative; }
+
+    .search-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 16px;
+      height: 16px;
+      color: var(--text-tertiary);
+      pointer-events: none;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 10px 14px 10px 40px;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      background: #FFFFFF;
+      font-size: 14px;
+      color: var(--text-primary);
+      outline: none;
+      transition: all 0.2s ease;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+    
+    [data-theme="dark"] .search-input { background: var(--bg-input); }
+
+    .search-input:focus {
+      box-shadow: 0 0 0 2px var(--primary-light);
+    }
+
+    /* Category Tags */
+    .categories {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 8px 24px 16px;
+      background: var(--bg-body);
+    }
+
+    .category {
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid transparent;
+      background: rgba(0,0,0,0.04);
+      color: var(--text-secondary);
+      transition: all 0.2s ease;
+    }
+    
+    [data-theme="dark"] .category { background: rgba(255,255,255,0.1); }
+
+    .category:hover {
+      background: rgba(0,0,0,0.08);
+      color: var(--text-primary);
+    }
+
+    .category.active {
+      background: var(--text-primary);
+      color: #FFFFFF;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      transform: scale(1.02);
+    }
+    
+    [data-theme="dark"] .category.active {
+      background: #FFFFFF;
+      color: #000000;
+    }
+
+    /* Prompt List */
+    .prompt-list {
+      max-height: 380px;
+      overflow-y: auto;
+      padding: 8px 24px 24px;
+      background-color: var(--bg-body);
+      /* Hide scrollbar */
+      scrollbar-width: none;
+    }
+    .prompt-list::-webkit-scrollbar { display: none; }
+
+    /* Prompt Card */
+    .prompt-item {
+      padding: 20px;
+      margin-bottom: 12px;
+      background: var(--bg-card);
+      border: 1px solid transparent;
+      box-shadow: var(--shadow-card);
+      border-radius: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      transition: all 0.2s var(--ease-bounce);
+      position: relative;
+      cursor: default;
+    }
+
+    .prompt-item:hover {
+      transform: translateY(-2px) scale(1.005);
+      box-shadow: var(--shadow-card-hover);
+      z-index: 1;
+    }
+    
+    /* Press feedback */
+    .prompt-item:active {
+      transform: scale(0.98);
+    }
+
+    .prompt-info { flex: 1; min-width: 0; padding-right: 12px; }
+
+    .prompt-title {
+      font-weight: 600;
+      font-size: 15px;
+      margin-bottom: 6px;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+    }
+
+    .prompt-category {
+      display: inline-block;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: var(--primary-light);
+      color: var(--primary);
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    .prompt-content {
+      color: var(--text-secondary);
+      font-size: 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 260px;
+      line-height: 1.6;
+    }
+
+    /* Action Buttons (show on hover) */
+    .prompt-actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+      opacity: 0;
+      transform: translateX(5px);
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .prompt-item:hover .prompt-actions {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    .btn-action {
+      background: var(--bg-body);
+      border: none;
+      cursor: pointer;
+      color: var(--text-secondary);
+      padding: 6px;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-action:hover {
+      background: var(--text-primary);
+      color: #FFFFFF;
+      transform: translateY(-1px);
+    }
+    
+    [data-theme="dark"] .btn-action:hover {
+      background: #FFFFFF;
+      color: #000000;
+    }
+
+    .btn-action.delete:hover {
+      background: var(--error);
+      color: #FFFFFF;
+    }
+
+    .btn-action svg { width: 16px; height: 16px; }
+
+    /* Empty State */
+    .empty-state { text-align: center; padding: 60px 24px; color: var(--text-secondary); opacity: 0.6; }
+    .empty-state .icon { width: 48px; height: 48px; margin-bottom: 16px; color: var(--text-tertiary); stroke-width: 1; }
+    .empty-state p { font-size: 15px; margin-bottom: 8px; }
+    .empty-state p:first-of-type { font-weight: 600; color: var(--text-primary); }
+
+    /* Form Styles */
+    .add-prompt {
+      background: var(--bg-card);
+      padding: 24px;
+      margin: 16px 20px;
+      border-radius: 16px;
+      box-shadow: var(--shadow-card);
+    }
+
+    .form-group { margin-bottom: 20px; }
+    label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text-primary); }
+
+    input, textarea, select {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      font-size: 14px;
+      font-family: inherit;
+      background: var(--bg-input);
+      color: var(--text-primary);
+      transition: all 0.2s ease;
+    }
+
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      background: var(--bg-card);
+      box-shadow: 0 0 0 2px var(--primary-light);
+    }
+
+    textarea { min-height: 140px; resize: vertical; line-height: 1.6; }
+
+    select {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2386868B' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 36px;
+      cursor: pointer;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #FFFFFF;
+      box-shadow: 0 4px 12px rgba(0, 122, 255, 0.25);
+    }
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(0, 122, 255, 0.35);
+    }
+    .btn-primary:active { transform: scale(0.98); }
+
+    .btn-secondary {
+      background: var(--bg-input);
+      color: var(--text-primary);
+    }
+    .btn-secondary:hover { background: var(--bg-tertiary); }
+    .btn-secondary:active { transform: scale(0.98); }
+
+    .btn svg { width: 18px; height: 18px; }
+    .btn-group { display: flex; gap: 12px; }
+
+    /* Settings Page */
+    .settings-section { padding: 20px; }
+    .settings-group {
+      background: var(--bg-card);
+      border-radius: 16px;
+      box-shadow: var(--shadow-card);
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+    .settings-group-title {
+      font-size: 12px; font-weight: 600; color: var(--text-secondary);
+      text-transform: uppercase; letter-spacing: 0.05em; padding: 0 4px; margin-bottom: 10px;
+    }
+    .settings-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 24px; border-bottom: 1px solid var(--bg-body);
+    }
+    .settings-item:last-child { border-bottom: none; }
+    .settings-item-label { font-size: 15px; font-weight: 500; color: var(--text-primary); }
+    .settings-item-desc { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+
+    /* Toggle */
+    .toggle {
+      position: relative; width: 52px; height: 30px;
+      background: var(--bg-input); border-radius: 15px;
+      cursor: pointer; transition: background 0.2s ease;
+    }
+    .toggle.active { background: var(--success); }
+    .toggle::after {
+      content: ''; position: absolute; top: 2px; left: 2px;
+      width: 26px; height: 26px; background: #FFFFFF;
+      border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      transition: transform 0.2s var(--ease-bounce);
+    }
+    .toggle.active::after { transform: translateX(22px); }
+
+    .data-actions { display: flex; gap: 12px; padding: 24px; }
+    .data-actions .btn { flex: 1; }
+
+    /* Notification */
+    .notification {
+      position: fixed; bottom: 32px; left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      padding: 12px 20px; background: #323232; color: #FFFFFF;
+      border-radius: 100px; font-size: 14px; font-weight: 600;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      opacity: 0; transition: all 0.3s var(--ease-bounce);
+      z-index: 1000; display: flex; align-items: center; gap: 10px;
+      backdrop-filter: blur(10px);
+    }
+    .notification.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .notification.error { background: var(--error); color: #FFF; }
+
+    .hidden { display: none !important; }
+    .developer-options { margin-top: 12px; padding: 16px; background: var(--bg-input); border-radius: 12px; }
+    
+    /* Entry Animation */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .prompt-item {
+      animation: fadeInUp 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+      opacity: 0;
+    }
+    
+    .prompt-item:nth-child(1) { animation-delay: 0.05s; }
+    .prompt-item:nth-child(2) { animation-delay: 0.08s; }
+    .prompt-item:nth-child(3) { animation-delay: 0.11s; }
+    .prompt-item:nth-child(4) { animation-delay: 0.14s; }
+    .prompt-item:nth-child(5) { animation-delay: 0.17s; }
+    .prompt-item:nth-child(n+6) { animation-delay: 0.2s; }
+  </style>
+  <script src="../lib/marked.min.js"></script>
+</head>
+<body>
+  <!-- 头部 -->
+  <header class="header">
+    <div class="header-top">
+      <div class="header-brand">
+        <img src="../../assets/icons/icon48.png" alt="Logo" class="header-logo">
+        <h1 class="header-title">提示词管理器</h1>
+      </div>
+      <span class="header-version" id="version">v1.3.0</span>
+    </div>
+    
+    <!-- 标签页 -->
+    <nav class="tabs">
+      <button class="tab active" data-tab="prompts">提示词列表</button>
+      <button class="tab" data-tab="add">添加提示词</button>
+      <button class="tab" data-tab="settings">设置</button>
+    </nav>
+  </header>
+
+  <!-- 主内容 -->
+  <main class="main">
+    <!-- 提示词列表 -->
+    <div class="section active" id="promptsSection">
+      <div class="toolbar">
+        <div class="search-container">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="search" class="search-input" id="searchPrompt" placeholder="搜索提示词..." autocomplete="off">
+        </div>
+      </div>
+      
+      <div class="categories" id="categories">
+        <div class="category active" data-category="all">全部</div>
+      </div>
+      
+      <div class="prompt-list" id="promptList">
+        <div class="empty-state hidden" id="emptyState">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/>
+            <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
+          </svg>
+          <p>暂无提示词</p>
+          <p>点击"添加提示词"开始创建</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 添加提示词 -->
+    <div class="section" id="addSection">
+      <div class="add-prompt">
+        <div class="form-group">
+          <label for="promptTitle">提示词标题</label>
+          <input type="text" id="promptTitle" placeholder="输入一个简短的标题">
+        </div>
+        
+        <div class="form-group">
+          <label for="promptCategory">分类</label>
+          <select id="promptCategory">
+            <option value="general">通用</option>
+            <option value="writing">写作</option>
+            <option value="coding">编程</option>
+            <option value="translation">翻译</option>
+            <option value="creativity">创意</option>
+            <option value="analysis">分析</option>
+            <option value="custom">自定义...</option>
+          </select>
+        </div>
+        
+        <div class="form-group hidden" id="customCategoryGroup">
+          <label for="customCategory">自定义分类名称</label>
+          <input type="text" id="customCategory" placeholder="输入分类名称">
+        </div>
+        
+        <div class="form-group">
+          <label for="promptContent">提示词内容</label>
+          <textarea id="promptContent" placeholder="输入提示词内容..."></textarea>
+        </div>
+        
+        <div class="btn-group">
+          <button class="btn btn-primary" id="addPromptBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14"/>
+              <path d="M12 5v14"/>
+            </svg>
+            添加提示词
+          </button>
+          <button class="btn btn-secondary" id="cancelAddBtn">取消</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 设置 -->
+    <div class="section" id="settingsSection">
+      <div class="settings-section">
+        <p class="settings-group-title">主题</p>
+        <div class="settings-group">
+          <div class="settings-item">
+            <div>
+              <div class="settings-item-label">外观主题</div>
+              <div class="settings-item-desc">选择浅色、深色或跟随系统</div>
+            </div>
+            <select id="themeSelect" style="width: auto; padding: 8px 32px 8px 12px;">
+              <option value="light">浅色</option>
+              <option value="dark">深色</option>
+              <option value="system">跟随系统</option>
+            </select>
+          </div>
+        </div>
+
+        <p class="settings-group-title">数据管理</p>
+        <div class="settings-group">
+          <div class="data-actions">
+            <button class="btn btn-secondary" id="exportBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              导出数据
+            </button>
+            <label for="importFile" class="btn btn-secondary" style="cursor: pointer;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              导入数据
+              <input type="file" id="importFile" accept=".json" style="display: none;">
+            </label>
+          </div>
+        </div>
+
+        <p class="settings-group-title">开发者</p>
+        <div class="settings-group">
+          <div class="settings-item">
+            <div>
+              <div class="settings-item-label">开发者模式</div>
+              <div class="settings-item-desc">启用调试功能和测试工具</div>
+            </div>
+            <div class="toggle" id="developerModeToggle"></div>
+          </div>
+        </div>
+
+        <div class="developer-options hidden" id="developerOptions">
+          <div class="btn-group">
+            <button class="btn btn-secondary" id="testInjectBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8.5 2h7"/>
+                <path d="M12 2v6.5"/>
+                <path d="m13.74 8.26 6.57 11.35c.67 1.14-.15 2.39-1.46 2.39H5.15c-1.31 0-2.13-1.25-1.46-2.39l6.57-11.35Z"/>
+              </svg>
+              测试按钮注入
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 通知提示 -->
+  <div id="notification" class="notification"></div>
+
+  <script src="js/popup.js"></script>
+</body>
+</html>

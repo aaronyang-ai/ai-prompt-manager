@@ -1,0 +1,46 @@
+{
+  "name": "ai-prompt-manager",
+  "version": "1.2.0",
+  "displayName": "AI提示词管理器",
+  "description": "一个强大的Chrome浏览器扩展，支持在ChatGPT、Claude、Gemini等8个主流AI平台高效管理和快速插入预设提示词",
+  "type": "module",
+  "scripts": {
+    "dev": "echo '\n⚠️  开发提示：请在 chrome://extensions/ 点击\"重新加载\"按钮\n' && echo '📝 修改代码后需要刷新AI页面（Cmd+Shift+R 硬刷新）\n'",
+    "validate": "node -e \"const m = require('./manifest.json'); console.log('✅ manifest.json 格式正确'); console.log('   版本:', m.version); console.log('   名称:', m.name);\"",
+    "clean": "find . -name '*.bak' -o -name '*.new' -o -name '*.backup' -o -name '*.temp' -o -name '.DS_Store' 2>/dev/null | xargs rm -f && echo '✅ 清理完成'",
+    "size": "du -sh . && echo '\n📊 详细大小:' && du -sh src/* assets/* 2>/dev/null",
+    "version": "node -e \"console.log('当前版本:', require('./manifest.json').version)\"",
+    "check": "npm run validate && npm run size",
+    "lint:check": "echo '💡 提示：项目使用原生JavaScript，无需构建工具'",
+    "info": "node -e \"const m = require('./manifest.json'); const p = require('./package.json'); console.log('\\n📦 项目信息'); console.log('   名称:', m.name); console.log('   版本:', m.version); console.log('   描述:', m.description); console.log('   作者:', p.author); console.log('   许可:', p.license); console.log('');\"",
+    "check-version": "node scripts/check-version.cjs",
+    "sync-version": "node scripts/sync-version.cjs",
+    "bump:patch": "node scripts/bump-version.cjs patch && npm run sync-version",
+    "bump:minor": "node scripts/bump-version.cjs minor && npm run sync-version",
+    "bump:major": "node scripts/bump-version.cjs major && npm run sync-version"
+  },
+  "keywords": [
+    "chrome-extension",
+    "chatgpt",
+    "claude",
+    "prompt",
+    "ai",
+    "管理器"
+  ],
+  "author": "aaron",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aaronyang-ai/ai-prompt-manager.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aaronyang-ai/ai-prompt-manager/issues"
+  },
+  "homepage": "https://github.com/aaronyang-ai/ai-prompt-manager#readme",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "devDependencies": {
+    "sharp": "^0.34.5"
+  }
+}
