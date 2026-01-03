@@ -1456,8 +1456,6 @@ function attachPromptItemEvents() {
           // Insert then send immediately
           insertPromptText(prompt.content)
             .then(() => {
-              // Show success notification
-              showUserNotification('提示词已插入到输入框', 'success', 2000);
               // Ensure text is fully inserted, add short delay before sending
               return new Promise(resolve => setTimeout(resolve, 100));
             })
@@ -1474,17 +1472,18 @@ function attachPromptItemEvents() {
             })
             .catch(err => {
               console.error('Error sending prompt:', err);
-              // Show error notification
+              // Show error notification only when send fails
               if (err.message.includes('未找到输入框')) {
                 // Already shown in insertPromptText
               } else {
                 showUserNotification(
-                  '无法自动发送。提示词可能已插入，请检查输入框后手动发送。',
-                  'error',
-                  4000
+                  '提示词已插入，请手动发送',
+                  'info',
+                  2500
                 );
               }
-              // Collapse button even on error
+              // Close menu and collapse button even on error
+              closeSideMenu();
               smartCollapseButton();
             });
         });
@@ -1648,36 +1647,36 @@ function findAIInput() {
       'textarea'                                            // Fallback textarea
     ];
   } else if (isGeminiPage()) {
-    // Gemini input selectors
+    // Gemini input selectors - Quill editor based
     selectors = [
-      'rich-textarea[placeholder*="输入"]',                  // Gemini rich text input
-      'rich-textarea',                                      // Gemini rich text component
-      'div[contenteditable="true"][role="textbox"]',        // Editable div
-      'textarea[placeholder*="Enter"]',                     // English input
-      'textarea[aria-label*="prompt"]',                     // Prompt input
-      '[role="textbox"]',                                   // Textbox role
-      'textarea',                                           // Generic textarea
-      'div[contenteditable="true"]'                         // Generic contenteditable
+      'rich-textarea .ql-editor[contenteditable="true"]',   // Quill editor inside rich-textarea (primary)
+      'rich-textarea div[contenteditable="true"]',          // Any contenteditable inside rich-textarea
+      'div.ql-editor[contenteditable="true"]',              // Quill editor directly
+      'div[contenteditable="true"][role="textbox"]',        // Editable div with textbox role
+      '[role="textbox"][contenteditable="true"]',           // Textbox role with contenteditable
+      'div[contenteditable="true"]',                        // Generic contenteditable
+      'textarea',                                           // Fallback textarea
     ];
   } else if (isGrokPage()) {
-    // Grok input selectors
+    // Grok input selectors - uses TipTap/ProseMirror editor
     selectors = [
-      'div[contenteditable="true"][data-testid*="grok"]',  // Grok specific input
+      'div.ProseMirror[contenteditable="true"]',            // ProseMirror editor (primary)
+      'div.tiptap[contenteditable="true"]',                 // TipTap editor
       'div[contenteditable="true"][role="textbox"]',        // Editable textbox
-      'textarea[placeholder*="Ask"]',                       // Ask input
       'div[contenteditable="true"]',                        // Generic contenteditable
       '[role="textbox"]',                                   // Textbox role
       'textarea'                                            // Fallback textarea
     ];
   } else if (isPerplexityPage()) {
-    // Perplexity input selectors
+    // Perplexity input selectors - uses contenteditable div
     selectors = [
+      'div[contenteditable="true"][role="textbox"]',        // Primary contenteditable textbox
+      'div[contenteditable="true"].overflow-auto',          // Overflow auto contenteditable
+      'div[contenteditable="true"]',                        // Generic contenteditable
+      '[role="textbox"]',                                   // Textbox role
       'textarea[placeholder*="Ask"]',                       // Ask anything input
       'textarea[placeholder*="Follow"]',                    // Follow up input
-      'textarea[rows]',                                     // Multi-line textarea
-      'div[contenteditable="true"]',                        // contenteditable
-      '[role="textbox"]',                                   // Textbox role
-      'textarea'                                            // Generic textarea
+      'textarea',                                           // Generic textarea
     ];
   } else if (isDeepSeekPage()) {
     // DeepSeek input selectors
@@ -2133,17 +2132,45 @@ function _performInsertion(text) {
         else if (textarea.isContentEditable) {
           console.log('Using contentEditable method');
 
-          // Set text content
-          textarea.textContent = textToInsert;
+          // Try InputEvent first (works for Perplexity and similar frameworks)
+          try {
+            // Clear existing content first
+            textarea.innerHTML = '';
+            textarea.focus();
 
-          // Set cursor to text end
-          setCursorToEnd(textarea, textToInsert.length);
+            // Use InputEvent with insertText type
+            const inputEvent = new InputEvent('input', {
+              bubbles: true,
+              cancelable: true,
+              inputType: 'insertText',
+              data: textToInsert
+            });
+            textarea.dispatchEvent(inputEvent);
 
-          // Trigger necessary events
-          textarea.dispatchEvent(new Event('input', { bubbles: true }));
-          textarea.dispatchEvent(new Event('change', { bubbles: true }));
+            // Check if it worked
+            const currentContent = textarea.textContent || textarea.innerText || '';
+            if (currentContent.length > 0) {
+              console.log('InputEvent method successful');
+              setCursorToEnd(textarea, textToInsert.length);
+              success = true;
+            }
+          } catch (inputEventError) {
+            console.log('InputEvent method failed, trying direct textContent');
+          }
 
-          success = true;
+          // Fallback: Set text content directly
+          if (!success) {
+            textarea.textContent = textToInsert;
+
+            // Set cursor to text end
+            setCursorToEnd(textarea, textToInsert.length);
+
+            // Trigger necessary events
+            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+            textarea.dispatchEvent(new Event('change', { bubbles: true }));
+
+            success = true;
+          }
         }
 
         // Method 3: Use execCommand as last resort
@@ -2269,85 +2296,151 @@ function sendPrompt() {
 
       console.log('Attempting to send prompt...');
 
-      // First try to find and click send button (most reliable method)
-      const sendButton = document.querySelector('button[data-testid="send-button"]') ||
-                         document.querySelector('button.absolute.p-1.rounded-md') ||
-                         document.querySelector('form button[type="submit"]');
+      // For Claude and Doubao, prioritize keyboard events as they don't have standard send buttons
+      const useKeyboardFirst = isClaudePage() || isDoubaoPage();
 
-      if (sendButton) {
-        // Check if button is clickable (not disabled)
-        if (!sendButton.disabled) {
-          // Use fixed delay to ensure React has processed input state change
-          setTimeout(() => {
-            sendButton.click();
-            console.log('Sent successfully by clicking send button');
-            resolve();
-          }, 10);
-          return;
-        } else {
-          console.log('Send button is disabled, trying other methods');
+      if (useKeyboardFirst) {
+        console.log('Using keyboard-first strategy for this platform');
+        sendViaKeyboard(textarea, resolve, reject);
+        return;
+      }
+
+      // Get platform-specific send button selectors
+      let sendButtonSelectors = [];
+
+      if (isChatGPTPage()) {
+        sendButtonSelectors = [
+          'button[data-testid="send-button"]',
+          'button[aria-label="Send prompt"]',
+          'button[aria-label="发送提示"]',
+          'form button[type="submit"]',
+          'button.absolute.p-1.rounded-md',
+        ];
+      } else if (isGeminiPage()) {
+        sendButtonSelectors = [
+          'button[aria-label="Send message"]',
+          'button[aria-label="发送消息"]',
+          'button.send-button',
+          'button[mattooltip*="Send"]',
+          'button[mattooltip*="发送"]',
+          '.input-area-container button[aria-label*="send" i]',
+          'button[jsname][data-idom-class*="send"]',
+        ];
+      } else if (isGrokPage()) {
+        sendButtonSelectors = [
+          'button[aria-label="Send"]',
+          'button[aria-label="发送"]',
+          'button[data-testid="send-button"]',
+          'form button[type="submit"]',
+        ];
+      } else if (isPerplexityPage()) {
+        sendButtonSelectors = [
+          'button[aria-label="Submit"]',
+          'button[aria-label="提交"]',
+          'button.bg-super',
+          'button[type="submit"]',
+        ];
+      } else if (isDeepSeekPage()) {
+        sendButtonSelectors = [
+          'button[aria-label="发送"]',
+          'button[aria-label="Send"]',
+          'div[role="button"][aria-label*="发送"]',
+          'button.el-button--primary',
+          'form button[type="submit"]',
+        ];
+      } else if (isQwenPage()) {
+        sendButtonSelectors = [
+          'button[aria-label="发送"]',
+          'button[aria-label="Send"]',
+          'button.ant-btn-primary',
+          'button[type="submit"]',
+        ];
+      } else {
+        // Generic fallback selectors
+        sendButtonSelectors = [
+          'button[type="submit"]',
+          'button[aria-label*="send" i]',
+          'button[aria-label*="发送"]',
+          'form button:last-of-type',
+        ];
+      }
+
+      // Try to find send button
+      let sendButton = null;
+      for (const selector of sendButtonSelectors) {
+        try {
+          const btn = document.querySelector(selector);
+          if (btn && btn.offsetParent !== null) {
+            sendButton = btn;
+            console.log(`Found send button: ${selector}`);
+            break;
+          }
+        } catch (e) {
+          // Ignore invalid selector errors
         }
       }
 
-      // If button not found or not clickable, try simulating Enter key press
-      const enterEvent = new KeyboardEvent('keydown', {
-        bubbles: true,
-        cancelable: true,
-        key: 'Enter',
-        code: 'Enter',
-        keyCode: 13,
-        which: 13
-      });
-
-      // Try first send
-      textarea.focus(); // Ensure input has focus
-      const wasHandled = !textarea.dispatchEvent(enterEvent);
-
-      if (wasHandled) {
-        console.log('Sent successfully via keyboard event');
-        resolve();
-      } else {
-        // Try another method
+      if (sendButton && !sendButton.disabled) {
+        // Use fixed delay to ensure framework has processed input state change
         setTimeout(() => {
-          try {
-            // Create a new form submit event
-            const form = textarea.closest('form');
-            if (form) {
-              const submitEvent = new SubmitEvent('submit', {
-                bubbles: true,
-                cancelable: true
-              });
-
-              form.dispatchEvent(submitEvent);
-              console.log('Sent successfully via form submit');
-              resolve();
-            } else {
-              // Last try with key combination
-              const ctrlEnterEvent = new KeyboardEvent('keydown', {
-                bubbles: true,
-                cancelable: true,
-                key: 'Enter',
-                code: 'Enter',
-                keyCode: 13,
-                which: 13,
-                ctrlKey: true
-              });
-
-              textarea.dispatchEvent(ctrlEnterEvent);
-              console.log('Sent via Ctrl+Enter combination');
-              resolve();
-            }
-          } catch (err) {
-            console.error('All send methods failed:', err);
-            reject(err);
-          }
-        }, 100);
+          sendButton.click();
+          console.log('Sent successfully by clicking send button');
+          resolve();
+        }, 50);
+        return;
       }
+
+      console.log('Send button not found or disabled, trying keyboard events');
+      sendViaKeyboard(textarea, resolve, reject);
+
     } catch (error) {
       console.error('Error sending prompt:', error);
       reject(error);
     }
   });
+}
+
+// Helper function to send via keyboard events
+function sendViaKeyboard(textarea, resolve, reject) {
+  try {
+    textarea.focus();
+
+    // Create complete keyboard event sequence
+    const eventOptions = {
+      bubbles: true,
+      cancelable: true,
+      key: 'Enter',
+      code: 'Enter',
+      keyCode: 13,
+      which: 13,
+      charCode: 13,
+      view: window
+    };
+
+    // Dispatch keydown
+    const keydownEvent = new KeyboardEvent('keydown', eventOptions);
+    textarea.dispatchEvent(keydownEvent);
+
+    // Dispatch keypress (some frameworks listen to this)
+    const keypressEvent = new KeyboardEvent('keypress', eventOptions);
+    textarea.dispatchEvent(keypressEvent);
+
+    // Small delay then keyup
+    setTimeout(() => {
+      const keyupEvent = new KeyboardEvent('keyup', eventOptions);
+      textarea.dispatchEvent(keyupEvent);
+
+      // Also try triggering input event
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+
+      console.log('Sent via keyboard event sequence');
+      resolve();
+    }, 10);
+
+  } catch (err) {
+    console.error('Keyboard send failed:', err);
+    reject(err);
+  }
 }
 
 // Add slash command functionality
