@@ -269,6 +269,13 @@ async function loadPrompts() {
 function savePromptsToStorage(prompts) {
   return new Promise((resolve, reject) => {
     try {
+      // Check if extension context is still valid
+      if (!chrome.runtime?.id) {
+        console.warn('Extension context invalidated, skipping save');
+        resolve();
+        return;
+      }
+
       console.log('[AI Prompt] Saving', prompts.length, 'prompts to sync storage...');
 
       chrome.storage.sync.set({ prompts: prompts }, () => {
@@ -287,8 +294,13 @@ function savePromptsToStorage(prompts) {
         resolve();
       });
     } catch (error) {
-      console.error('Error occurred while saving prompts:', error);
-      reject(error);
+      // Silently handle extension context errors
+      if (error.message?.includes('Extension context invalidated')) {
+        resolve();
+      } else {
+        console.error('Error occurred while saving prompts:', error);
+        reject(error);
+      }
     }
   });
 }
@@ -766,6 +778,13 @@ async function renderSideMenu() {
 async function getLastExpandedCategory() {
   return new Promise((resolve) => {
     try {
+      // Check if extension context is still valid
+      if (!chrome.runtime?.id) {
+        console.warn('Extension context invalidated, skipping storage access');
+        resolve(null);
+        return;
+      }
+
       chrome.storage.sync.get('lastExpandedCategory', (result) => {
         if (chrome.runtime.lastError) {
           console.warn('Failed to get last expanded category:', chrome.runtime.lastError);
@@ -775,7 +794,10 @@ async function getLastExpandedCategory() {
         resolve(result.lastExpandedCategory || null);
       });
     } catch (err) {
-      console.warn('Error getting last expanded category:', err);
+      // Silently handle extension context errors
+      if (!err.message?.includes('Extension context invalidated')) {
+        console.warn('Error getting last expanded category:', err);
+      }
       resolve(null);
     }
   });
@@ -784,13 +806,21 @@ async function getLastExpandedCategory() {
 // Save expanded category
 function saveExpandedCategory(category) {
   try {
+    // Check if extension context is still valid
+    if (!chrome.runtime?.id) {
+      return;
+    }
+
     chrome.storage.sync.set({ lastExpandedCategory: category }, () => {
       if (chrome.runtime.lastError) {
         console.warn('Failed to save expanded category:', chrome.runtime.lastError);
       }
     });
   } catch (err) {
-    console.warn('Error saving expanded category:', err);
+    // Silently handle extension context errors
+    if (!err.message?.includes('Extension context invalidated')) {
+      console.warn('Error saving expanded category:', err);
+    }
   }
 }
 
