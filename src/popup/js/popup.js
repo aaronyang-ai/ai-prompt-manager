@@ -374,7 +374,7 @@ function initDeveloperMode() {
   }
   
   // Load developer mode state from storage
-  chrome.storage.local.get(["developerMode"], (result) => {
+  chrome.storage.sync.get(["developerMode"], (result) => {
     const isDeveloperMode = result.developerMode || false;
     
     // Support two toggle types: checkbox and custom div.toggle
@@ -409,7 +409,7 @@ function initDeveloperMode() {
     options.classList.toggle('hidden', !isEnabled);
     
     // Save state
-    chrome.storage.local.set({ developerMode: isEnabled });
+    chrome.storage.sync.set({ developerMode: isEnabled });
     
     // Show or hide debug info
     const debugInfo = document.getElementById("debugInfo");
@@ -518,7 +518,7 @@ async function showDebugInfo() {
     console.error('Debug info retrieval failure details:', error);
 
     // Check developer mode state and control debug info display
-    chrome.storage.local.get(["developerMode"], (result) => {
+    chrome.storage.sync.get(["developerMode"], (result) => {
       const isDeveloperMode = result.developerMode || false;
       const debugInfo = document.getElementById("debugInfo");
       if (debugInfo) {
@@ -617,8 +617,10 @@ async function testInject() {
 // Load prompts from storage
 async function loadPrompts() {
   try {
+    console.log('[Popup] Loading prompts from sync storage...');
+
     const data = await new Promise((resolve, reject) => {
-      chrome.storage.local.get('prompts', (result) => {
+      chrome.storage.sync.get('prompts', (result) => {
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message));
           return;
@@ -626,9 +628,15 @@ async function loadPrompts() {
         resolve(result);
       });
     });
-    
+
+    console.log('[Popup] Raw data from sync:', data);
+    console.log('[Popup] Prompts array:', data.prompts);
+
     allPrompts = data.prompts || [];
     console.log(`Loaded ${allPrompts.length} prompts from storage`);
+
+    // Log each prompt title for debugging
+    allPrompts.forEach((p, i) => console.log(`  [${i}] ${p.title}`));
 
     // Update UI
     renderPromptList();
@@ -978,11 +986,15 @@ async function addPrompt() {
       
       if (currentTab && isSupportedAIPage(currentTab.url)) {
         try {
+          console.log('[Popup] On AI page, sending addPrompt to content.js...');
           // Use content.js addPrompt function
           await chrome.tabs.sendMessage(currentTab.id, {
             action: 'addPrompt',
             prompt: newPrompt
           });
+          console.log('[Popup] Message sent to content.js successfully');
+          // Also update local array to keep in sync
+          allPrompts.push(newPrompt);
         } catch (err) {
           console.warn('通过content.js添加提示词失败，使用本地添加:', err);
           // Fallback to directly adding to local array
@@ -990,6 +1002,7 @@ async function addPrompt() {
           await savePrompts();
         }
       } else {
+        console.log('[Popup] Not on AI page, saving directly...');
         // Directly add to local array
         allPrompts.push(newPrompt);
         await savePrompts();
@@ -1170,15 +1183,24 @@ async function savePrompts() {
   try {
     // Send message to content.js to refresh prompts
     if (currentTab && isSupportedAIPage(currentTab.url)) {
-      chrome.tabs.sendMessage(currentTab.id, { 
-        action: 'refreshPrompts' 
+      chrome.tabs.sendMessage(currentTab.id, {
+        action: 'refreshPrompts'
       }).catch(err => {
         console.log('刷新提示词时出错，可能页面未加载完成:', err);
       });
     }
-    
-    // Save to local storage
-    await chrome.storage.local.set({ prompts: allPrompts });
+
+    console.log('[Popup] Saving', allPrompts.length, 'prompts to sync storage...');
+
+    // Save to sync storage
+    await chrome.storage.sync.set({ prompts: allPrompts });
+
+    console.log('[Popup] Save complete, verifying...');
+
+    // Verify the save
+    const result = await chrome.storage.sync.get('prompts');
+    console.log('[Popup] Verification - prompts in sync:', result.prompts?.length || 0);
+
   } catch (error) {
     console.error('保存提示词失败:', error);
     throw error;
@@ -1280,7 +1302,7 @@ function importPrompts(event) {
 // Load theme settings
 function loadTheme() {
   try {
-  chrome.storage.local.get('theme', (data) => {
+  chrome.storage.sync.get('theme', (data) => {
     const theme = data.theme || 'light';
       if (DOM.themeSelect) {
     DOM.themeSelect.value = theme;
@@ -1298,7 +1320,7 @@ function loadTheme() {
 function setTheme(theme) {
   try {
     // Save theme settings
-    chrome.storage.local.set({ theme });
+    chrome.storage.sync.set({ theme });
 
     // Remove old theme setting method, use data-theme attribute instead
     // This way all style definitions can be managed in CSS, avoiding hardcoded colors in JS
@@ -1314,7 +1336,7 @@ function setTheme(theme) {
         window.themeMediaListener = window.matchMedia('(prefers-color-scheme: dark)');
         window.themeMediaListener.addEventListener('change', (e) => {
           // Only respond when current setting is system
-          chrome.storage.local.get('theme', (data) => {
+          chrome.storage.sync.get('theme', (data) => {
             if (data.theme === 'system') {
               document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
             }

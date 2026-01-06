@@ -128,8 +128,8 @@ log('AI Prompt Manager loaded');
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  log('Message received:', request);
-  
+  console.log('[AI Prompt] Message received:', request.action);
+
   try {
     if (request.action === 'testInject') {
       console.log('Received test inject message');
@@ -231,8 +231,8 @@ async function loadPrompts() {
     console.log('Starting to load prompts...');
 
     return new Promise((resolve, reject) => {
-      // Load prompts from local storage
-      chrome.storage.local.get('prompts', (result) => {
+      // Load prompts from sync storage (persists after reinstall)
+      chrome.storage.sync.get('prompts', (result) => {
         if (chrome.runtime.lastError) {
           console.error('Failed to load prompts from storage:', chrome.runtime.lastError);
           // Use default prompts on failure
@@ -244,13 +244,13 @@ async function loadPrompts() {
         // If there are saved prompts, use them
         if (result.prompts && Array.isArray(result.prompts) && result.prompts.length > 0) {
           availablePrompts = result.prompts;
-          console.log(`Loaded ${availablePrompts.length} prompts from local storage`);
+          console.log(`Loaded ${availablePrompts.length} prompts from sync storage`);
         } else {
           // Otherwise use default prompts
           availablePrompts = DEFAULT_PROMPTS;
-          // Save default prompts to local storage
+          // Save default prompts to sync storage
           savePromptsToStorage(DEFAULT_PROMPTS)
-            .then(() => console.log('Default prompts saved to local storage'))
+            .then(() => console.log('Default prompts saved to sync storage'))
             .catch(err => console.error('Failed to save default prompts:', err));
           console.log('Using default prompts');
         }
@@ -269,13 +269,21 @@ async function loadPrompts() {
 function savePromptsToStorage(prompts) {
   return new Promise((resolve, reject) => {
     try {
-      chrome.storage.local.set({ prompts: prompts }, () => {
+      console.log('[AI Prompt] Saving', prompts.length, 'prompts to sync storage...');
+
+      chrome.storage.sync.set({ prompts: prompts }, () => {
         if (chrome.runtime.lastError) {
           console.error('Failed to save prompts to storage:', chrome.runtime.lastError);
           reject(chrome.runtime.lastError);
           return;
         }
-        console.log(`Saved ${prompts.length} prompts to local storage`);
+        console.log(`[AI Prompt] Saved ${prompts.length} prompts to sync storage successfully`);
+
+        // Verify the save by reading back
+        chrome.storage.sync.get('prompts', (result) => {
+          console.log('[AI Prompt] Verification - prompts in sync:', result.prompts?.length || 0);
+        });
+
         resolve();
       });
     } catch (error) {
@@ -287,17 +295,24 @@ function savePromptsToStorage(prompts) {
 
 // Inject trigger button
 function injectTriggerButton() {
-  // If button already exists, ensure it's visible
-  if (triggerButton) {
-    triggerButton.style.display = 'flex';
-    return triggerButton;
-  }
+  try {
+    // If button already exists, ensure it's visible
+    if (triggerButton) {
+      triggerButton.style.display = 'flex';
+      return triggerButton;
+    }
 
-  console.log('Starting to inject prompt trigger button');
+    // Check if document.body exists
+    if (!document.body) {
+      console.warn('document.body not ready, delaying injection');
+      return null;
+    }
 
-  // Create trigger button
-  triggerButton = document.createElement('div');
-  triggerButton.className = CONFIG.triggerButtonClass;
+    console.log('Starting to inject prompt trigger button');
+
+    // Create trigger button
+    triggerButton = document.createElement('div');
+    triggerButton.className = CONFIG.triggerButtonClass;
 
   // Add expand/collapse icon and text
   triggerButton.innerHTML = `
@@ -348,6 +363,10 @@ function injectTriggerButton() {
 
   console.log('Prompt trigger button injected successfully');
   return triggerButton;
+  } catch (err) {
+    console.warn('Failed to inject trigger button:', err.message);
+    return null;
+  }
 }
 
 // Handle trigger button click
@@ -747,7 +766,7 @@ async function renderSideMenu() {
 async function getLastExpandedCategory() {
   return new Promise((resolve) => {
     try {
-      chrome.storage.local.get('lastExpandedCategory', (result) => {
+      chrome.storage.sync.get('lastExpandedCategory', (result) => {
         if (chrome.runtime.lastError) {
           console.warn('Failed to get last expanded category:', chrome.runtime.lastError);
           resolve(null);
@@ -765,7 +784,7 @@ async function getLastExpandedCategory() {
 // Save expanded category
 function saveExpandedCategory(category) {
   try {
-    chrome.storage.local.set({ lastExpandedCategory: category }, () => {
+    chrome.storage.sync.set({ lastExpandedCategory: category }, () => {
       if (chrome.runtime.lastError) {
         console.warn('Failed to save expanded category:', chrome.runtime.lastError);
       }
@@ -2488,7 +2507,7 @@ function initialize() {
 
     // Listen for storage changes, auto-update prompt list
     chrome.storage.onChanged.addListener((changes, namespace) => {
-      if (namespace === 'local' && changes.prompts) {
+      if (namespace === 'sync' && changes.prompts) {
         console.log('Detected prompt storage change, refreshing prompt list');
 
         // Update local prompt data
@@ -2538,19 +2557,28 @@ function initialize() {
         console.log('Setting up page change listener');
         const observer = new MutationObserver(debounce(() => {
           try {
+            // Check if document.body exists before querying
+            if (!document.body) return;
+
             if (isSupportedAIPage() && !document.querySelector(`.${CONFIG.triggerButtonClass}`)) {
               console.log('Detected page change, re-injecting button');
               injectTriggerButton();
             }
           } catch (err) {
-            console.error('Failed to re-inject on page change:', err);
+            // Only log if it's not a common extension context error
+            if (!err.message?.includes('Extension context invalidated')) {
+              console.warn('Re-inject check skipped:', err.message);
+            }
           }
         }, 1000));
 
+        // Only observe if document.body exists
+        if (document.body) {
         observer.observe(document.body, {
           childList: true,
           subtree: true
         });
+        }
       } else {
         console.log('Not on supported AI page, not injecting button');
       }
@@ -2649,6 +2677,8 @@ function findInputArea() {
 // Add new prompt
 async function addPrompt(newPrompt) {
   try {
+    console.log('[AI Prompt] addPrompt called with:', newPrompt.title);
+
     // Ensure newPrompt has id
     if (!newPrompt.id) {
       newPrompt.id = 'prompt-' + Date.now();
@@ -2657,9 +2687,9 @@ async function addPrompt(newPrompt) {
     // Add to in-memory array
     availablePrompts.push(newPrompt);
 
-    // Save to local storage
+    // Save to sync storage
     await savePromptsToStorage(availablePrompts);
-    console.log('New prompt added and saved to storage:', newPrompt.title);
+    console.log('[AI Prompt] New prompt added and saved to sync storage:', newPrompt.title);
 
     // If sidebar is open, refresh display
     if (sideMenu) {

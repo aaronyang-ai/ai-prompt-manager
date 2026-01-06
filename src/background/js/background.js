@@ -10,14 +10,113 @@ const DEBUG_MODE = false;
 const log = DEBUG_MODE ? console.log.bind(console, '[Background]') : () => {};
 const error = console.error.bind(console, '[Background]');
 
+// ===== Data Migration: local → sync =====
+// Migrate data from chrome.storage.local to chrome.storage.sync
+// This ensures data persists after extension reinstall
+async function migrateLocalToSync() {
+  try {
+    // Get data from both storages
+    const [localData, syncData] = await Promise.all([
+      new Promise(resolve => chrome.storage.local.get(['prompts', 'theme', 'developerMode', 'lastExpandedCategory'], resolve)),
+      new Promise(resolve => chrome.storage.sync.get(['prompts', 'theme', 'developerMode', 'lastExpandedCategory'], resolve))
+    ]);
+
+    // Debug: Log storage status
+    console.log('[Background] Storage status check:');
+    console.log('  Local prompts:', localData.prompts?.length || 0, 'items');
+    console.log('  Sync prompts:', syncData.prompts?.length || 0, 'items');
+
+    // Check if local has prompts data and sync doesn't (or sync is empty)
+    const localHasPrompts = localData.prompts && Array.isArray(localData.prompts) && localData.prompts.length > 0;
+    const syncHasPrompts = syncData.prompts && Array.isArray(syncData.prompts) && syncData.prompts.length > 0;
+
+    if (localHasPrompts && !syncHasPrompts) {
+      log('Migrating data from local to sync storage...');
+
+      // Prepare data to migrate
+      const dataToMigrate = {};
+      if (localData.prompts) dataToMigrate.prompts = localData.prompts;
+      if (localData.theme) dataToMigrate.theme = localData.theme;
+      if (localData.developerMode !== undefined) dataToMigrate.developerMode = localData.developerMode;
+      if (localData.lastExpandedCategory) dataToMigrate.lastExpandedCategory = localData.lastExpandedCategory;
+
+      // Check sync storage quota (100KB limit)
+      const dataSize = JSON.stringify(dataToMigrate).length;
+      console.log('[Background] Data size to migrate:', dataSize, 'bytes');
+      if (dataSize > 90000) { // 90KB warning threshold
+        error('Data too large for sync storage:', dataSize, 'bytes');
+        return false;
+      }
+
+      // Migrate to sync storage
+      await new Promise((resolve, reject) => {
+        chrome.storage.sync.set(dataToMigrate, () => {
+          if (chrome.runtime.lastError) {
+            reject(chrome.runtime.lastError);
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      log('Migration complete:', Object.keys(dataToMigrate).length, 'keys migrated');
+
+      // Clear migrated data from local storage (keep version info)
+      await new Promise(resolve => {
+        chrome.storage.local.remove(['prompts', 'theme', 'developerMode', 'lastExpandedCategory'], resolve);
+      });
+
+      log('Local storage cleaned up');
+      return true;
+    } else if (syncHasPrompts) {
+      log('Sync storage already has data, no migration needed');
+      return false;
+    } else {
+      log('No data to migrate');
+      return false;
+    }
+  } catch (err) {
+    error('Migration failed:', err);
+    return false;
+  }
+}
+
+// Check sync storage status (for debugging)
+async function checkSyncStatus() {
+  try {
+    const syncData = await new Promise(resolve =>
+      chrome.storage.sync.get(null, resolve)
+    );
+    const bytesUsed = await new Promise(resolve =>
+      chrome.storage.sync.getBytesInUse(null, resolve)
+    );
+
+    console.log('[Background] Sync storage status:');
+    console.log('  Keys:', Object.keys(syncData));
+    console.log('  Prompts count:', syncData.prompts?.length || 0);
+    console.log('  Bytes used:', bytesUsed, '/ 102400 (100KB)');
+
+    return { data: syncData, bytesUsed };
+  } catch (err) {
+    console.error('[Background] Failed to check sync status:', err);
+    return null;
+  }
+}
+
 // ===== Extension Installation and Update =====
-chrome.runtime.onInstalled.addListener((details) => {
+chrome.runtime.onInstalled.addListener(async (details) => {
   const currentVersion = chrome.runtime.getManifest().version;
+
+  // Always try to migrate data on install/update
+  await migrateLocalToSync();
+
+  // Check sync status for debugging
+  await checkSyncStatus();
 
   if (details.reason === 'install') {
     log('AI Prompt Manager installed, version:', currentVersion);
 
-    // Save installation info
+    // Save installation info (keep in local, not user data)
     chrome.storage.local.set({
       version: currentVersion,
       installedAt: Date.now()
@@ -32,7 +131,7 @@ chrome.runtime.onInstalled.addListener((details) => {
     const previousVersion = details.previousVersion;
     log(`AI Prompt Manager updated: ${previousVersion} → ${currentVersion}`);
 
-    // Save update info
+    // Save update info (keep in local, not user data)
     chrome.storage.local.set({
       version: currentVersion,
       lastUpdate: Date.now(),
