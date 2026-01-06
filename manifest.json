@@ -3,6 +3,7 @@
   "name": "AI提示词管理器",
   "version": "1.2.0",
   "description": "在ChatGPT、Claude、Gemini、Grok、Perplexity、DeepSeek、豆包、千问等AI页面高效管理和快速插入预设提示词",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwvznzScfhOmVb5DvWmzp94TpFZ3otgQPQs9fHFMZ6F0VNHTGJGFpwx9h0K+TUFaprq32oSeJQ9uV4F+wmQVlWe0Qu17YgsbCTMH3/FryufKJQa/SFRCELo6lKok63eM0jUEUfoaS3co2F+IX/c5U7mTpFqQAzKOEhpqc0SSssnud+1N9UPiFDvGUl4IRlRLFolMrORahXu5DQMKkhE+o3BegiXVUMbqCwZAZU31hVPsFSRlE5iRKukdsinc94g7+TL6h+x+Sqn9wZWgIN7aXjTmGTJ2feJ4t/vU8A47lP+W9Y8V00ORg03AVR/2DX0ckoMdXTOmdVdqQoLbqegqU0QIDAQAB",
   "icons": {
     "16": "assets/icons/icon16.png",
     "48": "assets/icons/icon48.png",
