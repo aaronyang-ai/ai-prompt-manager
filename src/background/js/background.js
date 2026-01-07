@@ -21,11 +21,6 @@ async function migrateLocalToSync() {
       new Promise(resolve => chrome.storage.sync.get(['prompts', 'theme', 'developerMode', 'lastExpandedCategory'], resolve))
     ]);
 
-    // Debug: Log storage status
-    console.log('[Background] Storage status check:');
-    console.log('  Local prompts:', localData.prompts?.length || 0, 'items');
-    console.log('  Sync prompts:', syncData.prompts?.length || 0, 'items');
-
     // Check if local has prompts data and sync doesn't (or sync is empty)
     const localHasPrompts = localData.prompts && Array.isArray(localData.prompts) && localData.prompts.length > 0;
     const syncHasPrompts = syncData.prompts && Array.isArray(syncData.prompts) && syncData.prompts.length > 0;
@@ -42,7 +37,6 @@ async function migrateLocalToSync() {
 
       // Check sync storage quota (100KB limit)
       const dataSize = JSON.stringify(dataToMigrate).length;
-      console.log('[Background] Data size to migrate:', dataSize, 'bytes');
       if (dataSize > 90000) { // 90KB warning threshold
         error('Data too large for sync storage:', dataSize, 'bytes');
         return false;
@@ -81,37 +75,12 @@ async function migrateLocalToSync() {
   }
 }
 
-// Check sync storage status (for debugging)
-async function checkSyncStatus() {
-  try {
-    const syncData = await new Promise(resolve =>
-      chrome.storage.sync.get(null, resolve)
-    );
-    const bytesUsed = await new Promise(resolve =>
-      chrome.storage.sync.getBytesInUse(null, resolve)
-    );
-
-    console.log('[Background] Sync storage status:');
-    console.log('  Keys:', Object.keys(syncData));
-    console.log('  Prompts count:', syncData.prompts?.length || 0);
-    console.log('  Bytes used:', bytesUsed, '/ 102400 (100KB)');
-
-    return { data: syncData, bytesUsed };
-  } catch (err) {
-    console.error('[Background] Failed to check sync status:', err);
-    return null;
-  }
-}
-
 // ===== Extension Installation and Update =====
 chrome.runtime.onInstalled.addListener(async (details) => {
   const currentVersion = chrome.runtime.getManifest().version;
 
   // Always try to migrate data on install/update
   await migrateLocalToSync();
-
-  // Check sync status for debugging
-  await checkSyncStatus();
 
   if (details.reason === 'install') {
     log('AI Prompt Manager installed, version:', currentVersion);

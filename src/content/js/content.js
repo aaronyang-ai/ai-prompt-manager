@@ -128,21 +128,16 @@ log('AI Prompt Manager loaded');
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log('[AI Prompt] Message received:', request.action);
-
   try {
     if (request.action === 'testInject') {
-      console.log('Received test inject message');
       injectTriggerButton();
       sendResponse({success: true, message: 'Test injection successful'});
       return true;
     }
 
     if (request.action === 'insertPrompt') {
-      console.log('Received insert prompt message:', request.prompt);
       insertPromptText(request.prompt)
         .then(() => {
-          console.log('Prompt inserted successfully');
           sendResponse({success: true, message: 'Prompt inserted successfully'});
         })
         .catch(err => {
@@ -153,11 +148,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     if (request.action === 'refreshPrompts') {
-      console.log('Received refresh prompts message');
       loadPrompts()
         .then(() => {
           if (sideMenu) {
-            console.log('Re-rendering side menu');
             renderSideMenu();
           }
           sendResponse({success: true, message: 'Prompts refreshed successfully'});
@@ -170,7 +163,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     if (request.action === 'addPrompt') {
-      console.log('Received add prompt message:', request.prompt);
       addPrompt(request.prompt)
         .then(() => {
           sendResponse({success: true, message: 'Prompt added successfully'});
@@ -183,7 +175,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     if (request.action === 'updatePrompt') {
-      console.log('Received update prompt message:', request.id, request.prompt);
       updatePrompt(request.id, request.prompt)
         .then(() => {
           sendResponse({success: true, message: 'Prompt updated successfully'});
@@ -196,7 +187,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     if (request.action === 'deletePrompt') {
-      console.log('Received delete prompt message:', request.id);
       deletePrompt(request.id)
         .then(() => {
           sendResponse({success: true, message: 'Prompt deleted successfully'});
@@ -209,13 +199,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     if (request.action === 'getPrompts') {
-      console.log('Received get prompts list message');
       sendResponse({success: true, prompts: availablePrompts});
       return true;
     }
 
     // Unknown message
-    console.warn('Received unknown message type:', request.action);
     sendResponse({success: false, error: 'Unknown message type'});
     return true;
   } catch (error) {
@@ -228,8 +216,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Load prompts
 async function loadPrompts() {
   try {
-    console.log('Starting to load prompts...');
-
     return new Promise((resolve, reject) => {
       // Load prompts from sync storage (persists after reinstall)
       chrome.storage.sync.get('prompts', (result) => {
@@ -244,15 +230,11 @@ async function loadPrompts() {
         // If there are saved prompts, use them
         if (result.prompts && Array.isArray(result.prompts) && result.prompts.length > 0) {
           availablePrompts = result.prompts;
-          console.log(`Loaded ${availablePrompts.length} prompts from sync storage`);
         } else {
           // Otherwise use default prompts
           availablePrompts = DEFAULT_PROMPTS;
           // Save default prompts to sync storage
-          savePromptsToStorage(DEFAULT_PROMPTS)
-            .then(() => console.log('Default prompts saved to sync storage'))
-            .catch(err => console.error('Failed to save default prompts:', err));
-          console.log('Using default prompts');
+          savePromptsToStorage(DEFAULT_PROMPTS).catch(() => {});
         }
         resolve(availablePrompts);
       });
@@ -271,12 +253,9 @@ function savePromptsToStorage(prompts) {
     try {
       // Check if extension context is still valid
       if (!chrome.runtime?.id) {
-        console.warn('Extension context invalidated, skipping save');
         resolve();
         return;
       }
-
-      console.log('[AI Prompt] Saving', prompts.length, 'prompts to sync storage...');
 
       chrome.storage.sync.set({ prompts: prompts }, () => {
         if (chrome.runtime.lastError) {
@@ -284,13 +263,6 @@ function savePromptsToStorage(prompts) {
           reject(chrome.runtime.lastError);
           return;
         }
-        console.log(`[AI Prompt] Saved ${prompts.length} prompts to sync storage successfully`);
-
-        // Verify the save by reading back
-        chrome.storage.sync.get('prompts', (result) => {
-          console.log('[AI Prompt] Verification - prompts in sync:', result.prompts?.length || 0);
-        });
-
         resolve();
       });
     } catch (error) {
@@ -2528,24 +2500,17 @@ function debounce(func, wait) {
 // Initialize
 function initialize() {
   try {
-    console.log('Starting to initialize AI Prompt Manager...');
-
     // Try to load Marked.js library
-    loadMarkedJS().catch(err => {
-      console.warn('Failed to load Markdown parsing library, prompts will display as plain text:', err);
-    });
+    loadMarkedJS().catch(() => {});
 
     // Listen for storage changes, auto-update prompt list
     chrome.storage.onChanged.addListener((changes, namespace) => {
       if (namespace === 'sync' && changes.prompts) {
-        console.log('Detected prompt storage change, refreshing prompt list');
-
         // Update local prompt data
         availablePrompts = changes.prompts.newValue || [];
 
         // If side menu exists, update UI
         if (sideMenu) {
-          console.log('Re-rendering side menu');
           renderSideMenu();
         }
       }
@@ -2555,12 +2520,10 @@ function initialize() {
     loadPrompts().then(() => {
       // If on supported AI page, create trigger button
       if (isSupportedAIPage()) {
-        console.log('Currently on supported AI page, preparing to inject button');
         // Wait for DOM to fully load
         if (document.readyState === 'loading') {
           document.addEventListener('DOMContentLoaded', () => {
             // Use setTimeout to ensure page is fully loaded
-            console.log('DOM loading, setting injection in 2 seconds');
             setTimeout(() => {
               try {
                 injectTriggerButton();
@@ -2572,7 +2535,6 @@ function initialize() {
           });
         } else {
           // If DOM already loaded, initialize directly
-          console.log('DOM already loaded, setting injection in 2 seconds');
           setTimeout(() => {
             try {
               injectTriggerButton();
@@ -2584,14 +2546,12 @@ function initialize() {
         }
 
         // Listen for page changes to re-inject on SPA navigation
-        console.log('Setting up page change listener');
         const observer = new MutationObserver(debounce(() => {
           try {
             // Check if document.body exists before querying
             if (!document.body) return;
 
             if (isSupportedAIPage() && !document.querySelector(`.${CONFIG.triggerButtonClass}`)) {
-              console.log('Detected page change, re-injecting button');
               injectTriggerButton();
             }
           } catch (err) {
@@ -2609,8 +2569,6 @@ function initialize() {
           subtree: true
         });
         }
-      } else {
-        console.log('Not on supported AI page, not injecting button');
       }
     }).catch(err => {
       console.error('Failed to load prompts:', err);
@@ -2677,8 +2635,6 @@ function isQwenPage() {
 
 // Find input area
 function findInputArea() {
-  console.log('Finding input area...');
-
   // Latest ChatGPT input area selectors
   const selectors = [
     'textarea[data-id]',
@@ -2695,20 +2651,16 @@ function findInputArea() {
   for (const selector of selectors) {
     const inputElem = document.querySelector(selector);
     if (inputElem) {
-      console.log(`Found input area: ${selector}`);
       return inputElem;
     }
   }
 
-  console.log('Input area not found');
   return null;
 }
 
 // Add new prompt
 async function addPrompt(newPrompt) {
   try {
-    console.log('[AI Prompt] addPrompt called with:', newPrompt.title);
-
     // Ensure newPrompt has id
     if (!newPrompt.id) {
       newPrompt.id = 'prompt-' + Date.now();
@@ -2719,7 +2671,6 @@ async function addPrompt(newPrompt) {
 
     // Save to sync storage
     await savePromptsToStorage(availablePrompts);
-    console.log('[AI Prompt] New prompt added and saved to sync storage:', newPrompt.title);
 
     // If sidebar is open, refresh display
     if (sideMenu) {

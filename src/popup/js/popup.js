@@ -617,8 +617,6 @@ async function testInject() {
 // Load prompts from storage
 async function loadPrompts() {
   try {
-    console.log('[Popup] Loading prompts from sync storage...');
-
     const data = await new Promise((resolve, reject) => {
       chrome.storage.sync.get('prompts', (result) => {
         if (chrome.runtime.lastError) {
@@ -629,14 +627,8 @@ async function loadPrompts() {
       });
     });
 
-    console.log('[Popup] Raw data from sync:', data);
-    console.log('[Popup] Prompts array:', data.prompts);
-
     allPrompts = data.prompts || [];
     console.log(`Loaded ${allPrompts.length} prompts from storage`);
-
-    // Log each prompt title for debugging
-    allPrompts.forEach((p, i) => console.log(`  [${i}] ${p.title}`));
 
     // Update UI
     renderPromptList();
@@ -986,13 +978,11 @@ async function addPrompt() {
       
       if (currentTab && isSupportedAIPage(currentTab.url)) {
         try {
-          console.log('[Popup] On AI page, sending addPrompt to content.js...');
           // Use content.js addPrompt function
           await chrome.tabs.sendMessage(currentTab.id, {
             action: 'addPrompt',
             prompt: newPrompt
           });
-          console.log('[Popup] Message sent to content.js successfully');
           // Also update local array to keep in sync
           allPrompts.push(newPrompt);
         } catch (err) {
@@ -1002,7 +992,6 @@ async function addPrompt() {
           await savePrompts();
         }
       } else {
-        console.log('[Popup] Not on AI page, saving directly...');
         // Directly add to local array
         allPrompts.push(newPrompt);
         await savePrompts();
@@ -1185,21 +1174,13 @@ async function savePrompts() {
     if (currentTab && isSupportedAIPage(currentTab.url)) {
       chrome.tabs.sendMessage(currentTab.id, {
         action: 'refreshPrompts'
-      }).catch(err => {
-        console.log('刷新提示词时出错，可能页面未加载完成:', err);
+      }).catch(() => {
+        // Ignore errors - page may not be loaded
       });
     }
 
-    console.log('[Popup] Saving', allPrompts.length, 'prompts to sync storage...');
-
     // Save to sync storage
     await chrome.storage.sync.set({ prompts: allPrompts });
-
-    console.log('[Popup] Save complete, verifying...');
-
-    // Verify the save
-    const result = await chrome.storage.sync.get('prompts');
-    console.log('[Popup] Verification - prompts in sync:', result.prompts?.length || 0);
 
   } catch (error) {
     console.error('保存提示词失败:', error);
