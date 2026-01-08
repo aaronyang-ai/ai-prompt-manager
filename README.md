@@ -15,6 +15,7 @@ A powerful Chrome browser extension that supports efficient management and quick
 
 ### 💡 Advanced Features
 - **Multi-Platform Support**: Perfect compatibility with ChatGPT, Claude, Gemini, Grok, Perplexity, DeepSeek, Doubao, Qwen and other 8 major AI platforms
+- **Keyboard Shortcuts**: `Alt+P` to toggle menu, `↑/↓` to navigate, `Enter` to insert, `ESC` to close
 - **Drag Positioning**: Trigger button supports free dragging for personalized interface layout
 - **Smart Button Management**: Intelligent collapse mechanism with multiple auto-collapse trigger conditions
 - **Precise Cursor Positioning**: Automatically positions cursor at optimal location after text insertion for easy editing

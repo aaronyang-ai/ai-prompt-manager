@@ -122,6 +122,7 @@ let isMenuOpen = false;
 let isButtonCollapsed = true; // Button is collapsed by default
 let autoCollapseTimer = null; // Auto-collapse timer
 let isUserInteracting = false; // Whether user is interacting
+let selectedPromptIndex = -1; // Keyboard navigation selected index
 
 // Initialization info
 log('AI Prompt Manager loaded');
@@ -744,6 +745,9 @@ async function renderSideMenu() {
 
   // Add events for prompt items
   attachPromptItemEvents();
+
+  // Reset keyboard selection when menu is re-rendered
+  selectedPromptIndex = -1;
 }
 
 // Get last expanded category
@@ -1301,6 +1305,9 @@ function handleSearch(event) {
 
     // Rebind events
     attachPromptItemEvents();
+
+    // Reset keyboard selection after search
+    selectedPromptIndex = -1;
   } catch (error) {
     console.error('Search processing failed:', error);
   }
@@ -1329,6 +1336,8 @@ async function filterPromptsByCategory(category) {
         // Rebind events
         initializeCategoryFolding();
         attachPromptItemEvents();
+        // Reset keyboard selection
+        selectedPromptIndex = -1;
       });
     } else {
       // Animated transition: filter specified category (single category expanded display)
@@ -1386,6 +1395,8 @@ async function filterPromptsByCategory(category) {
         // Rebind events
         attachPromptItemEvents();
         // Single category mode doesn't need Accordion interaction
+        // Reset keyboard selection
+        selectedPromptIndex = -1;
       });
     }
   } catch (error) {
@@ -1523,6 +1534,9 @@ function closeSideMenu() {
 
   sideMenu.classList.remove('open');
   isMenuOpen = false;
+
+  // Reset keyboard selection state
+  resetKeyboardSelection();
 
   // Reset user interaction state
   isUserInteracting = false;
@@ -2488,6 +2502,111 @@ function setupSlashCommands() {
   });
 }
 
+// Get visible prompt items for keyboard navigation
+function getVisiblePromptItems() {
+  if (!sideMenu) return [];
+  // Get prompts from expanded accordion panels or search results
+  return Array.from(sideMenu.querySelectorAll(
+    '.accordion-panel.expanded .prompt-item, .search-results .prompt-item'
+  ));
+}
+
+// Navigate prompts with arrow keys
+function navigatePrompts(direction) {
+  const items = getVisiblePromptItems();
+  if (items.length === 0) return;
+
+  // Remove current selection
+  if (selectedPromptIndex >= 0 && items[selectedPromptIndex]) {
+    items[selectedPromptIndex].classList.remove('keyboard-selected');
+  }
+
+  // Calculate new index
+  selectedPromptIndex += direction;
+  if (selectedPromptIndex < 0) selectedPromptIndex = items.length - 1;
+  if (selectedPromptIndex >= items.length) selectedPromptIndex = 0;
+
+  // Add selection and scroll into view
+  const selectedItem = items[selectedPromptIndex];
+  selectedItem.classList.add('keyboard-selected');
+  selectedItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+// Insert selected prompt via keyboard
+function insertSelectedPrompt() {
+  const items = getVisiblePromptItems();
+  if (selectedPromptIndex < 0 || !items[selectedPromptIndex]) return;
+
+  const item = items[selectedPromptIndex];
+  const id = item.dataset.id;
+  const prompt = availablePrompts.find(p => p.id === id);
+
+  if (prompt) {
+    insertPromptText(prompt.content).then(() => {
+      closeSideMenu();
+      setTimeout(() => smartCollapseButton(), 200);
+    }).catch(err => {
+      console.error('Error inserting prompt via keyboard:', err);
+      smartCollapseButton();
+    });
+  }
+}
+
+// Reset keyboard selection state
+function resetKeyboardSelection() {
+  if (sideMenu) {
+    const selected = sideMenu.querySelector('.prompt-item.keyboard-selected');
+    if (selected) {
+      selected.classList.remove('keyboard-selected');
+    }
+  }
+  selectedPromptIndex = -1;
+}
+
+// Setup keyboard shortcuts
+function setupKeyboardShortcuts() {
+  document.addEventListener('keydown', (e) => {
+    // Alt/Option+P: Toggle side menu
+    // Use e.code instead of e.key because Mac Option+P produces 'π' character
+    if (e.altKey && e.code === 'KeyP') {
+      e.preventDefault();
+      toggleSideMenu();
+      return;
+    }
+
+    // Following shortcuts only work when menu is open
+    if (!isMenuOpen) return;
+
+    // Check if search input is focused - allow normal behavior
+    const searchInput = sideMenu?.querySelector('.search-input');
+    const isSearchFocused = searchInput && document.activeElement === searchInput;
+
+    // ESC: Close menu (works even when search is focused)
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeSideMenu();
+      return;
+    }
+
+    // Arrow keys and Enter: Only when search is not focused
+    if (isSearchFocused) return;
+
+    // Arrow Down/Up: Navigate prompts
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      navigatePrompts(e.key === 'ArrowDown' ? 1 : -1);
+      return;
+    }
+
+    // Enter: Insert selected prompt
+    if (e.key === 'Enter' && selectedPromptIndex >= 0) {
+      e.preventDefault();
+      insertSelectedPrompt();
+      return;
+    }
+  });
+}
+
 // Debounce function
 function debounce(func, wait) {
   let timeout;
@@ -2528,6 +2647,7 @@ function initialize() {
               try {
                 injectTriggerButton();
                 setupSlashCommands();
+                setupKeyboardShortcuts();
               } catch (err) {
                 console.error('Failed to inject button or setup slash commands:', err);
               }
@@ -2539,6 +2659,7 @@ function initialize() {
             try {
               injectTriggerButton();
               setupSlashCommands();
+              setupKeyboardShortcuts();
             } catch (err) {
               console.error('Failed to inject button or setup slash commands:', err);
             }

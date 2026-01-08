@@ -1078,6 +1078,20 @@
 .ai-prompt-side-menu .accordion-panel.expanded .prompt-item:nth-child(5) { animation-delay: 0.17s; }
 .ai-prompt-side-menu .accordion-panel.expanded .prompt-item:nth-child(n+6) { animation-delay: 0.2s; }
 
+/* ===== Keyboard Navigation Styles ===== */
+.ai-prompt-side-menu .prompt-item.keyboard-selected {
+  background: rgba(0, 122, 255, 0.12) !important;
+  outline: 2px solid #007AFF !important;
+  outline-offset: -2px !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  .ai-prompt-side-menu .prompt-item.keyboard-selected {
+    background: rgba(10, 132, 255, 0.2) !important;
+    outline-color: #0A84FF !important;
+  }
+}
+
 
 /* ===== Qwen Platform Specific Fixes ===== */
 /* Qwen uses Ant Design which pollutes input styles */
